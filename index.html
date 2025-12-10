@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>고기 굽기 마스터</title>
+    <!-- Tailwind CSS를 사용하여 스타일링합니다. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 커스텀 게임 스타일 */
+        body {
+            background-color: #f7fafc; /* Tailwind gray-50 */
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 600px;
+            width: 95%;
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .grill {
+            height: 120px;
+            background-color: #333; /* 숯불 색 */
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            position: relative;
+            /* 숯불의 깊이감 표현 */
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5), 0 5px 10px rgba(100, 0, 0, 0.5);
+            border: 4px solid #555;
+        }
+
+        .meat {
+            width: 80px;
+            height: 80px;
+            background-color: #A0522D; /* 초기 고기 색상 (갈색 계열) */
+            border-radius: 50%;
+            /* 색상 변화와 뒤집기 애니메이션을 위한 트랜지션 */
+            transition: background-color 0.5s ease-out, transform 0.3s ease-out; 
+            border: 3px solid #f0f0f0;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            text-align: center;
+            line-height: 80px;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            position: absolute;
+        }
+        
+        /* 고기 뒤집기 애니메이션 (Y축 180도 회전) */
+        .flipped {
+            transform: rotateY(180deg);
+        }
+
+        .doneness-bar {
+            height: 20px;
+            background-color: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .doneness-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #ef4444; /* 초기 빨간색 */
+            transition: width 0.1s linear, background-color 0.5s;
+        }
+
+        /* 버튼 클릭 효과 */
+        button {
+            transition: all 0.1s;
+            box-shadow: 0 4px #9ca3af;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #9ca3af;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+<div id="app" class="game-container">
+    <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">🥩 고기 굽기 마스터 🥩</h1>
+
+    <!-- 게임 정보/요청 표시 영역 -->
+    <div class="bg-blue-50 p-4 rounded-lg mb-6 border-2 border-blue-200">
+        <p class="text-lg font-semibold text-blue-700">손님 요청: <span id="target-doneness" class="text-xl font-bold"></span></p>
+        <p class="text-sm text-gray-600 mt-2">🔥 현재 점수: <span id="current-score" class="font-bold text-red-600">0</span>점</p>
+    </div>
+
+    <!-- 고기 (Grill) 영역 -->
+    <div class="grill">
+        <div id="meat" class="meat">🥩</div>
+    </div>
+
+    <!-- 굽기 게이지 (Doneness Bar) -->
+    <div class="doneness-bar">
+        <div id="doneness-fill" class="doneness-fill"></div>
+    </div>
+    <p class="text-sm text-gray-500 mt-1 text-center"><span id="doneness-label">Rare (0%)</span></p>
+
+    <!-- 게임 메시지 출력 영역 -->
+    <div id="game-message" class="mt-4 p-3 bg-yellow-100 text-yellow-800 rounded-lg hidden font-medium text-center"></div>
+
+    <!-- 컨트롤 버튼 -->
+    <div class="flex justify-center space-x-4 mt-8">
+        <button id="grill-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all text-lg">
+            🔥 굽기 시작 / 뒤집기 🔥
+        </button>
+        <button id="serve-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all text-lg" disabled>
+            🍽️ 손님에게 서빙 🍽️
+        </button>
+    </div>
+
+    <!-- 결과 모달 (라운드 종료 시 표시) -->
+    <div id="result-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-xl w-full max-w-sm text-center shadow-2xl">
+            <h2 id="result-title" class="text-2xl font-bold mb-4 text-red-600"></h2>
+            <p id="result-details" class="text-gray-700 mb-4"></p>
+            <p class="text-2xl font-extrabold text-green-600">획득 점수: <span id="round-score"></span></p>
+            <p class="text-lg font-bold text-gray-800 mt-2">누적 점수: <span id="final-total-score"></span></p>
+            <button id="next-round-btn" class="mt-6 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl">
+                다음 손님 맞이하기 (새 라운드)
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // -----------------------------------------------------------------
+    // Apps Script API 호출 (GAS Web App 환경에서만 작동)
+    // -----------------------------------------------------------------
+    // GAS 서버 스크립트의 saveScore 함수를 호출할 준비
+    const saveScore = (score) => {
+        // google.script.run은 클라이언트에서 서버 함수를 비동기적으로 호출하는 GAS 기능입니다.
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+                .withSuccessHandler(res => console.log('Score saved:', res.message))
+                .withFailureHandler(err => console.error('Score save failed:', err))
+                .saveScore(score);
+        } else {
+            console.warn("GAS 환경이 아닙니다. 서버 함수 호출을 건너뜁니다.");
+        }
+    };
+
+    // -----------------------------------------------------------------
+    // 게임 설정 및 변수
+    // -----------------------------------------------------------------
+
+    // 굽기 정도(Doneness) 레벨 정의
+    const DONENESS_LEVELS = [
+        { name: "Rare (레어)", min: 0, max: 20, color: '#f87171' },
+        { name: "Medium Rare (미디움 레어)", min: 20, max: 40, color: '#f97316' },
+        { name: "Medium (미디움)", min: 40, max: 60, color: '#f59e0b' },
+        { name: "Medium Well (미디움 웰)", min: 60, max: 80, color: '#10b981' },
+        { name: "Well Done (웰던)", min: 80, max: 100, color: '#1d4ed8' }
+    ];
+
+    let gameState = {
+        totalScore: 0,
+        targetDoneness: 0, // 목표 굽기 % (0-100)
+        targetLevel: null,  // 목표 굽기 레벨 객체
+        currentDoneness: 0, // 현재 굽기 % (0-100)
+        isGrilling: false, // 현재 굽는 중인지 여부
+        grillInterval: null, // 굽기 타이머 ID
+        flipCount: 0, // 고기 뒤집기 횟수 (굽기 속도에 영향)
+        isFlipped: false // 고기 아이콘 뒤집기 상태
+    };
+
+    // -----------------------------------------------------------------
+    // DOM 요소 캐시 (성능 최적화)
+    // -----------------------------------------------------------------
+
+    const $ = (id) => document.getElementById(id);
+
+    const elements = {
+        targetDoneness: $('target-doneness'),
+        currentScore: $('current-score'),
+        donenessFill: $('doneness-fill'),
+        donenessLabel: $('doneness-label'),
+        grillBtn: $('grill-btn'),
+        serveBtn: $('serve-btn'),
+        meat: $('meat'),
+        gameMessage: $('game-message'),
+        resultModal: $('result-modal'),
+        resultTitle: $('result-title'),
+        resultDetails: $('result-details'),
+        roundScore: $('round-score'),
+        finalTotalScore: $('final-total-score'),
+        nextRoundBtn: $('next-round-btn')
+    };
+
+    // -----------------------------------------------------------------
+    // 게임 로직 함수
+    // -----------------------------------------------------------------
+
+    /**
+     * 현재 굽기 %에 해당하는 Doneness Level 객체를 반환합니다.
+     * @param {number} doneness - 현재 굽기 % (0-100)
+     * @returns {Object} - Doneness Level 객체
+     */
+    function getCurrentLevel(doneness) {
+        // 최대 레벨(Well Done)을 초과하는 경우를 처리하기 위해 역순으로 찾습니다.
+        for (let i = DONENESS_LEVELS.length - 1; i >= 0; i--) {
+            const level = DONENESS_LEVELS[i];
+            if (doneness >= level.min) {
+                return level;
+            }
+        }
+        return DONENESS_LEVELS[0]; // 0% 미만은 Rare
+    }
+
+    /**
+     * UI를 현재 게임 상태에 맞게 업데이트합니다.
+     */
+    function updateUI() {
+        const fill = elements.donenessFill;
+        const meat = elements.meat;
+        const currentLevel = getCurrentLevel(gameState.currentDoneness);
+
+        // 굽기 게이지 업데이트
+        fill.style.width = `${gameState.currentDoneness}%`;
+        fill.style.backgroundColor = currentLevel.color;
+        elements.donenessLabel.textContent = `${currentLevel.name} (${Math.round(gameState.currentDoneness)}%)`;
+
+        // 고기 색상 업데이트 (점점 어두워지게)
+        const cookRatio = gameState.currentDoneness / 100;
+        // RGB 색상 보간 (A0522D -> 502814)
+        const initialR = 160, initialG = 82, initialB = 45; 
+        const finalR = 80, finalG = 40, finalB = 20; 
+
+        const r = Math.round(initialR - (initialR - finalR) * cookRatio);
+        const g = Math.round(initialG - (initialG - finalG) * cookRatio);
+        const b = Math.round(initialB - (initialB - finalB) * cookRatio);
+        
+        meat.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        meat.style.opacity = 0.8 + (cookRatio * 0.2); // 구울수록 짙어지게
+
+        // 고기 뒤집기 상태 반영
+        if (gameState.isFlipped) {
+            meat.classList.add('flipped');
+        } else {
+            meat.classList.remove('flipped');
+        }
+
+        // 버튼 상태 업데이트
+        elements.serveBtn.disabled = !gameState.isGrilling;
+        elements.grillBtn.textContent = gameState.isGrilling ? '🔥 뒤집기 🔥' : '🔥 굽기 🔥';
+    }
+
+    /**
+     * 굽기 진행 루프입니다. 100ms마다 실행됩니다.
+     */
+    function grillStep() {
+        if (!gameState.isGrilling) return;
+
+        // 굽기 속도 계산 로직: 굽기 정도에 따라 속도가 변하고, 뒤집기 횟수에 따라 가속됩니다.
+        const baseSpeed = 0.5; // 기본 속도 (%/100ms)
+        const slowDownFactor = 0.4 * (gameState.currentDoneness / 100); // 굽기 정도에 따른 둔화
+        const flipBoost = 0.1 * gameState.flipCount; // 뒤집기에 따른 가속
+        const speed = Math.max(0.1, baseSpeed - slowDownFactor + flipBoost);
+
+        gameState.currentDoneness += speed;
+
+        // 100% 초과 방지 및 자동 서빙 (탄 고기 처리)
+        if (gameState.currentDoneness >= 100) {
+            gameState.currentDoneness = 100;
+            stopGrill();
+            showMessage("고기가 다 타버렸어요! (Well Done 초과)", 'bg-red-200 text-red-900');
+            serveMeat();
+        }
+
+        updateUI();
+    }
+
+    /**
+     * 게임 시작/뒤집기 버튼 핸들러
+     */
+    function handleGrillAction() {
+        if (!gameState.isGrilling) {
+            // 굽기 시작
+            gameState.isGrilling = true;
+            gameState.grillInterval = setInterval(grillStep, 100); // 0.1초마다 굽기 진행
+            showMessage("고기 굽기 시작!", 'bg-green-200 text-green-900');
+        } else {
+            // 뒤집기
+            gameState.flipCount++;
+            gameState.isFlipped = !gameState.isFlipped; // 뒤집기 상태 토글
+            showMessage(`고기를 뒤집었습니다! (뒤집기 ${gameState.flipCount}회)`, 'bg-blue-200 text-blue-900');
+        }
+        updateUI();
+    }
+
+    /**
+     * 굽기 중지
+     */
+    function stopGrill() {
+        if (gameState.grillInterval) {
+            clearInterval(gameState.grillInterval);
+            gameState.grillInterval = null;
+            gameState.isGrilling = false;
+        }
+    }
+
+    /**
+     * 서빙 및 점수 계산
+     */
+    function serveMeat() {
+        // 굽기 시작 전에는 서빙 불가 (오류 방지)
+        if (!gameState.isGrilling && gameState.flipCount === 0) return; 
+
+        stopGrill();
+
+        const actualDoneness = gameState.currentDoneness;
+        const targetDoneness = gameState.targetDoneness;
+        const targetLevel = gameState.targetLevel;
+
+        // 오차 계산: 목표치와 실제 굽기 정도의 차이
+        const error = Math.abs(actualDoneness - targetDoneness);
+
+        // 점수 계산 (최대 100점): 오차가 0이면 100점, 오차가 100이면 0점
+        const roundScore = Math.max(0, Math.round(100 - error));
+
+        gameState.totalScore += roundScore;
+
+        // 결과 모달 표시
+        elements.resultTitle.textContent = roundScore >= 95 ? '👑 완벽한 마스터! 👑' : roundScore >= 90 ? '⭐⭐ 최고예요! ⭐⭐' : roundScore >= 70 ? '👍 잘 구웠어요!' : '😢 아쉬워요...';
+        elements.resultTitle.style.color = roundScore >= 90 ? '#ef4444' : '#f97316'; 
+
+        elements.resultDetails.innerHTML = `
+            <p class="font-bold">손님 요청: <span class="text-blue-600">${targetLevel.name}</span> (${targetDoneness.toFixed(1)}%)</p>
+            <p class="font-bold">실제 굽기: <span class="text-green-600">${getCurrentLevel(actualDoneness).name}</span> (${actualDoneness.toFixed(1)}%)</p>
+            <p><strong>오차:</strong> ${error.toFixed(1)}%</p>
+        `;
+        elements.roundScore.textContent = roundScore;
+        elements.finalTotalScore.textContent = gameState.totalScore;
+        elements.resultModal.classList.remove('hidden');
+
+        // 서버에 점수 기록 (선택 사항 - Code.gs의 saveScore 함수 호출)
+        // saveScore(gameState.totalScore); 
+    }
+
+    /**
+     * 새로운 라운드 (손님) 시작
+     */
+    function startNewRound() {
+        // 1. 목표 굽기 레벨을 무작위로 선택
+        const levelIndex = Math.floor(Math.random() * DONENESS_LEVELS.length);
+        gameState.targetLevel = DONENESS_LEVELS[levelIndex];
+
+        // 2. 목표 굽기 % (레벨 범위 내에서 무작위, 좀 더 세밀한 목표치)
+        const min = gameState.targetLevel.min;
+        const max = gameState.targetLevel.max;
+        gameState.targetDoneness = Math.random() * (max - min) + min;
+
+        // 3. 게임 상태 초기화
+        gameState.currentDoneness = 0;
+        gameState.isGrilling = false;
+        gameState.flipCount = 0;
+        gameState.isFlipped = false;
+        stopGrill(); 
+
+        // 4. UI 업데이트
+        elements.targetDoneness.textContent = gameState.targetLevel.name;
+        elements.currentScore.textContent = gameState.totalScore;
+        elements.resultModal.classList.add('hidden');
+        elements.gameMessage.classList.add('hidden');
+        elements.meat.textContent = '🥩';
+        elements.meat.classList.remove('flipped'); 
+
+        // 5. 초기 UI 렌더링
+        updateUI();
+
+        showMessage("새 손님이 왔습니다! 고기를 올려주세요.", 'bg-blue-100 text-blue-800');
+    }
+
+    /**
+     * 화면에 메시지를 표시합니다.
+     */
+    function showMessage(text, className) {
+        const msg = elements.gameMessage;
+        msg.textContent = text;
+        msg.className = `mt-4 p-3 rounded-lg font-medium text-center ${className}`;
+        msg.classList.remove('hidden');
+    }
+
+
+    // -----------------------------------------------------------------
+    // 이벤트 리스너 설정
+    // -----------------------------------------------------------------
+
+    elements.grillBtn.addEventListener('click', handleGrillAction);
+    elements.serveBtn.addEventListener('click', serveMeat);
+    elements.nextRoundBtn.addEventListener('click', startNewRound);
+
+    // -----------------------------------------------------------------
+    // 게임 초기화
+    // -----------------------------------------------------------------
+    // 페이지 로드 시 첫 라운드를 시작합니다.
+    startNewRound();
+
+</script>
+</body>
+</html>
